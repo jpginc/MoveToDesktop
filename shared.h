@@ -20,7 +20,7 @@
 #define MAXDESKTOPS 255
 
 #ifdef _DEBUG
-#define LOGFILE "%temp%\\MoveToDesktop.log"
+#define LOGFILE "C:\\log\\MoveToDesktop.log"
 #include <stdarg.h>
 inline void Log(char *message, ...)
 {
