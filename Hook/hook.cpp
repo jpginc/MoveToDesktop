@@ -111,10 +111,11 @@ void HandleSysCommand(WPARAM numberOfTheDestinationDesktop, HWND hwnd)
 {
 	if (numberOfTheDestinationDesktop)
 	{
-		Log("Getting RootWindow of %X", hwnd);
+		Log("Getting RootWindow of %X to move to %X", hwnd, numberOfTheDestinationDesktop);
 		HWND rootHwnd = GetAncestor(hwnd, GA_ROOTOWNER);
 		if (rootHwnd != NULL)
 		{
+			Log("Root window is null");
 			hwnd = rootHwnd;
 		}
 
@@ -169,8 +170,10 @@ LRESULT CALLBACK GetMsgProc(INT code, WPARAM wParam, LPARAM lParam)
 
 BOOL WINAPI DllMain(HINSTANCE handle, DWORD dwReason, LPVOID reserved)
 {
+	
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
+		Log("Startup");
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{
