@@ -148,22 +148,6 @@ void HandleSysCommand(WPARAM numberOfTheDestinationDesktop, HWND hwnd)
 	}
 }
 
-LRESULT CALLBACK CallWndProc(INT code, WPARAM wParam, LPARAM lParam)
-{
-#define msg ((PCWPSTRUCT)lParam)
-	if (code == HC_ACTION)
-	{
-		if(msg->message == WM_SYSCOMMAND)
-		{
-			// Do the command
-			Log("WM_SYSCOMMAND %X %X", msg->wParam, msg->hwnd);
-			HandleSysCommand(msg->wParam, msg->hwnd);
-		}
-	}
-	return CallNextHookEx(NULL, code, wParam, lParam);
-#undef msg
-}
-
 LRESULT CALLBACK GetMsgProc(INT code, WPARAM wParam, LPARAM lParam)
 {
 #define msg ((PMSG)lParam)
