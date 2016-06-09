@@ -1,13 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+# Visual Studio 2013
+VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MoveToDesktop", "MoveToDesktop\MoveToDesktop.vcxproj", "{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}"
-	ProjectSection(ProjectDependencies) = postProject
-		{88D0BB04-305D-47DC-B4BD-9D3398FAFFE6} = {88D0BB04-305D-47DC-B4BD-9D3398FAFFE6}
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hook", "Hook\Hook.vcxproj", "{88D0BB04-305D-47DC-B4BD-9D3398FAFFE6}"
 EndProject
 Global
@@ -18,14 +13,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}.Debug|x64.ActiveCfg = Debug|x64
-		{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}.Debug|x64.Build.0 = Debug|x64
-		{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}.Debug|x86.ActiveCfg = Debug|Win32
-		{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}.Debug|x86.Build.0 = Debug|Win32
-		{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}.Release|x64.ActiveCfg = Release|x64
-		{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}.Release|x64.Build.0 = Release|x64
-		{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}.Release|x86.ActiveCfg = Release|Win32
-		{47BF4015-D8CF-4B07-B657-7E7ABDB72FDC}.Release|x86.Build.0 = Release|Win32
 		{88D0BB04-305D-47DC-B4BD-9D3398FAFFE6}.Debug|x64.ActiveCfg = Debug|x64
 		{88D0BB04-305D-47DC-B4BD-9D3398FAFFE6}.Debug|x64.Build.0 = Debug|x64
 		{88D0BB04-305D-47DC-B4BD-9D3398FAFFE6}.Debug|x86.ActiveCfg = Debug|Win32

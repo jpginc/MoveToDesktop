@@ -39,10 +39,6 @@ enum EComStatus
 
 int ComStatus = COMSTATUS_UNINITIALIZED;
 
-bool bAddedMenu = false;
-bool bReadIni = false;
-bool bSwitchDesktopAfterMove = false;
-
 BOOL InitCom()
 {
 	Log("Initalizing Com");
@@ -111,223 +107,9 @@ VOID FreeCom()
 	}
 }
 
-VOID ReadIni()
+void HandleSysCommand(WPARAM numberOfTheDestinationDesktop, HWND hwnd)
 {
-	if (bReadIni == true)
-		return;
-	bReadIni = true;
-	Log("Reading Ini");
-	TCHAR iniFile[MAX_PATH] = { 0 };
-	ExpandEnvironmentStrings(INIFILE, iniFile, _countof(iniFile));
-	bSwitchDesktopAfterMove = (GetPrivateProfileInt("MoveToDesktop", "SwitchDesktopAfterMove", 0, iniFile) != 0);
-	Log("Ini: SwitchDesktopAfterMove = %d", (bSwitchDesktopAfterMove ? 1 : 0));
-}
-
-INT GetIndexOfItem(HMENU menu, UINT id)
-{
-	for (int i = GetMenuItemCount(menu) - 1; i >= 0; i--)
-	{
-		int x = GetMenuItemID(menu, i);
-		if (id == x)
-		{
-			return i;
-		}
-	}
-	return -1;
-}
-
-VOID AddMenu(HWND hwnd, HMENU menu)
-{
-	if (bAddedMenu == true)
-		return;
-	
-	HMENU systemMenu;
-	if ((systemMenu = GetSystemMenu(hwnd, FALSE)) == NULL)
-	{
-		return;
-	}
-
-
-	if (menu != INVALID_HANDLE_VALUE && menu != systemMenu)
-	{
-		return;
-	}
-
-	bAddedMenu = true;
-
-	if (!InitCom())
-	{
-		return;
-	}
-
-	IObjectArray *pObjectArray = nullptr;
-	IVirtualDesktop *pCurrentDesktop = nullptr;
-
-	HRESULT hr = pDesktopManagerInternal->GetDesktops(&pObjectArray);
-	if (FAILED(hr))
-	{
-		return;
-	}
-
-	UINT count;
-	hr = pObjectArray->GetCount(&count);
-	if (FAILED(hr))
-	{
-		pObjectArray->Release();
-		return;
-	}
-
-
-	hr = pDesktopManagerInternal->GetCurrentDesktop(&pCurrentDesktop);
-	if (FAILED(hr))
-	{
-		pCurrentDesktop = nullptr;
-	}
-
-
-
-	MENUITEMINFO MoveToItem = { 0 };
-	MoveToItem.cbSize = sizeof(MoveToItem);
-	MoveToItem.fMask = MIIM_SUBMENU | MIIM_STATE | MIIM_ID | MIIM_STRING;
-	Log("Add MoveToMenu");
-	MoveToItem.wID = MOVETOMENU_ID;
-	MoveToItem.dwTypeData = TEXT("Move &To");
-	MoveToItem.hSubMenu = CreateMenu();
-	InsertMenuItem(systemMenu, SC_CLOSE, FALSE, &MoveToItem);
-	
-
-	for (UINT i = 0; i < count && i < MAXDESKTOPS; ++i)
-	{
-		IVirtualDesktop *pDesktop = nullptr;
-
-		if (FAILED(pObjectArray->GetAt(i, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
-			continue;
-
-		char desktopName[64] = { 0 };
-
-		sprintf_s(desktopName, sizeof(desktopName), "Desktop &%d", i + 1);
-
-		MENUITEMINFO item = { 0 };
-		item.cbSize = sizeof(item);
-		item.fMask = MIIM_CHECKMARKS | MIIM_STATE | MIIM_ID | MIIM_STRING;
-		item.fState = (pDesktop == pCurrentDesktop) ? MFS_CHECKED : MFS_UNCHECKED;
-		item.wID = MOVETOMENU_START + i;
-		item.dwTypeData = desktopName;
-		InsertMenuItem(MoveToItem.hSubMenu, -1, FALSE, &item);
-		pDesktop->Release();
-	}
-
-	// Create 'New Desktop' Item
-	{
-		MENUITEMINFO item = { 0 };
-		item.cbSize = sizeof(item);
-		item.fMask = MIIM_ID | MIIM_STRING;
-		item.fState = MFS_UNCHECKED;
-		item.wID = MOVETOMENU_NEW;
-		item.dwTypeData = TEXT("&New Desktop");
-		InsertMenuItem(MoveToItem.hSubMenu, -1, FALSE, &item);
-	}
-
-
-	pObjectArray->Release();
-
-	if (pCurrentDesktop != nullptr)
-	{
-		pCurrentDesktop->Release();
-	}
-}
-
-VOID RemoveMenu(HWND hwnd, HMENU menu)
-{
-	if (bAddedMenu == false)
-		return;
-	HMENU systemMenu;
-	if ((systemMenu = GetSystemMenu(hwnd, FALSE)) == NULL)
-	{
-		return;
-	}
-
-	if (menu != INVALID_HANDLE_VALUE && menu != systemMenu)
-	{
-		return;
-	}
-
-	bAddedMenu = false;
-
-	MENUITEMINFO MoveToItem = { 0 };
-	MoveToItem.cbSize = sizeof(MoveToItem);
-	MoveToItem.fMask = MIIM_SUBMENU | MIIM_STATE | MIIM_ID | MIIM_STRING;
-	if (GetMenuItemInfo(systemMenu, MOVETOMENU_ID, MF_BYCOMMAND, &MoveToItem) == NULL)
-	{
-		return;
-	}
-	Log("Remove MoveToMenu");
-	DestroyMenu(MoveToItem.hSubMenu);
-	DeleteMenu(systemMenu, MoveToItem.wID, MF_BYCOMMAND);	
-}
-
-INT GetCurrentDesktopIndex(UINT *count)
-{
-	*count = 0;
-	IObjectArray *pObjectArray = nullptr;
-	IVirtualDesktop *pCurrentDesktop = nullptr;
-
-	if (!InitCom())
-	{
-		Log("InitCom failed");
-		return -1;
-	}
-
-	HRESULT hr = pDesktopManagerInternal->GetDesktops(&pObjectArray);
-	if (FAILED(hr))
-	{
-		Log("pDesktopManagerInternal->GetDesktops failed %x", hr);
-		return -1;
-	}
-
-	hr = pObjectArray->GetCount(count);
-	if (FAILED(hr))
-	{
-		Log("pObjectArray->GetCount failed %x", hr);
-		pObjectArray->Release();
-		return -1;
-	}
-
-
-	hr = pDesktopManagerInternal->GetCurrentDesktop(&pCurrentDesktop);
-	if (FAILED(hr))
-	{
-		Log("pDesktopManagerInternal->GetCurrentDesktop failed %x", hr);
-		pObjectArray->Release();
-		return -1;
-	}
-
-	int index = -1;
-	for (UINT i = 0; i < *count && i < MAXDESKTOPS && index == -1; ++i)
-	{
-		IVirtualDesktop *pDesktop = nullptr;
-
-		if (FAILED(pObjectArray->GetAt(i, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
-			continue;
-		if (pDesktop == pCurrentDesktop)
-		{
-			index = MOVETOMENU_START + i;
-		}
-		pDesktop->Release();
-	}
-
-	pObjectArray->Release();
-
-	if (pCurrentDesktop != nullptr)
-	{
-		pCurrentDesktop->Release();
-	}
-	return index;
-}
-
-void HandleSysCommand(WPARAM wParam, HWND hwnd)
-{
-	if (wParam == MOVETOMENU_NEW)
+	if (numberOfTheDestinationDesktop)
 	{
 		Log("Getting RootWindow of %X", hwnd);
 		HWND rootHwnd = GetAncestor(hwnd, GA_ROOTOWNER);
@@ -336,43 +118,7 @@ void HandleSysCommand(WPARAM wParam, HWND hwnd)
 			hwnd = rootHwnd;
 		}
 
-		Log("Moving %X to new", hwnd);
-		IVirtualDesktop *pNewDesktop = nullptr;
-		HRESULT hr = pDesktopManagerInternal->CreateDesktopW(&pNewDesktop);
-		if (FAILED(hr))
-		{
-			return;
-		}
-		GUID id;
-		hr = pNewDesktop->GetID(&id);
-		if (SUCCEEDED(hr))
-		{
-			Log("pDesktopManager->MoveWindowToDesktop(%X, %X)", hwnd, id);
-			hr = pDesktopManager->MoveWindowToDesktop(hwnd, id);
-			if (SUCCEEDED(hr))
-			{
-				if (bSwitchDesktopAfterMove)
-				{
-					pDesktopManagerInternal->SwitchDesktop(pNewDesktop);
-				}
-			}
-			else
-			{
-				Log("Error %d on moving %X to %X", hr, hwnd, id);
-			}
-		}
-		pNewDesktop->Release();
-	}
-	else if (wParam >= MOVETOMENU_START && wParam <= MOVETOMENU_LAST)
-	{
-		Log("Getting RootWindow of %X", hwnd);
-		HWND rootHwnd = GetAncestor(hwnd, GA_ROOTOWNER);
-		if (rootHwnd != NULL)
-		{
-			hwnd = rootHwnd;
-		}
-
-		Log("Moving %X to %X", hwnd, wParam);
+		Log("Moving %X to %X", hwnd, numberOfTheDestinationDesktop);
 		IObjectArray *pObjectArray = nullptr;
 		HRESULT hr = pDesktopManagerInternal->GetDesktops(&pObjectArray);
 		if (FAILED(hr))
@@ -382,7 +128,7 @@ void HandleSysCommand(WPARAM wParam, HWND hwnd)
 		}
 
 		IVirtualDesktop *pDesktop = nullptr;
-		if (SUCCEEDED(pObjectArray->GetAt((UINT)wParam - MOVETOMENU_START, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
+		if (SUCCEEDED(pObjectArray->GetAt((UINT)numberOfTheDestinationDesktop, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
 		{
 			GUID id;
 			hr = pDesktop->GetID(&id);
@@ -391,14 +137,7 @@ void HandleSysCommand(WPARAM wParam, HWND hwnd)
 			{
 				Log("pDesktopManager->MoveWindowToDesktop(%X, %X)", hwnd, id);
 				hr = pDesktopManager->MoveWindowToDesktop(hwnd, id);
-				if (SUCCEEDED(hr))
-				{
-					if (bSwitchDesktopAfterMove)
-					{
-						pDesktopManagerInternal->SwitchDesktop(pDesktop);
-					}
-				}
-				else
+				if (! SUCCEEDED(hr))
 				{
 					Log("Error %X on moving %X to %X", hr, hwnd, id);
 				}
@@ -407,41 +146,6 @@ void HandleSysCommand(WPARAM wParam, HWND hwnd)
 		}
 		pObjectArray->Release();
 	}
-	else if (wParam == MOVETOMENU_LEFT)
-	{
-		UINT count;
-		int index = GetCurrentDesktopIndex(&count);
-		Log("Current Index is %d", index);
-		Log("Current Count is %d", count);
-		if (index == -1)
-			return;
-		if (index == MOVETOMENU_START)
-			return;
-		Log("Switch to %d", index - 1);
-		HandleSysCommand(--index, hwnd);
-	}
-	else if (wParam == MOVETOMENU_RIGHT)
-	{
-		UINT count;
-		int index = GetCurrentDesktopIndex(&count);
-		Log("Current Index is %d", index);
-		Log("Current Count is %d", count);
-		if (index == -1)
-			return;
-		if (index == MOVETOMENU_LAST)
-			return;
-		if ((++index) <= (int)(count + MOVETOMENU_NEW))
-		{
-			Log("Switch to %d", index);
-			HandleSysCommand(index, hwnd);
-
-		}
-		else
-		{
-			Log("Create new desktop");
-			HandleSysCommand(MOVETOMENU_NEW, hwnd);
-		}
-	}
 }
 
 LRESULT CALLBACK CallWndProc(INT code, WPARAM wParam, LPARAM lParam)
@@ -449,62 +153,11 @@ LRESULT CALLBACK CallWndProc(INT code, WPARAM wParam, LPARAM lParam)
 #define msg ((PCWPSTRUCT)lParam)
 	if (code == HC_ACTION)
 	{
-		switch (msg->message)
+		if(msg->message == WM_SYSCOMMAND)
 		{
-			// I am not sure if this is required, lets leve it in
-			case WM_ACTIVATE:
-			{
-				Log("WM_ACTIVATE");
-				GetSystemMenu(msg->hwnd, FALSE);
-				break;
-			}
-
-			// Populate menu
-			case WM_INITMENUPOPUP:
-			{
-				Log("WM_INITMENUPOPUP");
-				AddMenu(msg->hwnd, (HMENU)msg->wParam);
-				break;
-			}
-
-			// Some applications trigger WM_INITMENUPOPUP never or to late, thats why we use WM_ENTERIDLE
-			case WM_ENTERIDLE:
-			{
-				Log("WM_ENTERIDLE");
-				if (msg->wParam == MSGF_MENU)
-				{
-					AddMenu(msg->hwnd, (HMENU)INVALID_HANDLE_VALUE);
-					break;
-				}
-				break;
-			}
-
-			// Remove Entry again
-			case WM_UNINITMENUPOPUP:
-			{
-				Log("WM_UNINITMENUPOPUP");
-				RemoveMenu(msg->hwnd, (HMENU)msg->wParam);
-				break;
-			}
-
-			// For those who doesn't fire WM_UNINITMENUPOPUP 
-			case WM_MENUSELECT:
-			{
-				Log("WM_ENTERIDLE");
-				if (msg->lParam == NULL && HIWORD(msg->wParam) == 0xFFFF)
-				{
-					RemoveMenu(msg->hwnd, (HMENU)INVALID_HANDLE_VALUE);
-				}
-				break;
-			}
-
 			// Do the command
-			case WM_SYSCOMMAND:
-			{
-				Log("WM_SYSCOMMAND %X %X", msg->wParam, msg->hwnd);
-				HandleSysCommand(msg->wParam, msg->hwnd);
-				break;
-			}
+			Log("WM_SYSCOMMAND %X %X", msg->wParam, msg->hwnd);
+			HandleSysCommand(msg->wParam, msg->hwnd);
 		}
 	}
 	return CallNextHookEx(NULL, code, wParam, lParam);
@@ -534,7 +187,6 @@ BOOL WINAPI DllMain(HINSTANCE handle, DWORD dwReason, LPVOID reserved)
 {
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
-		ReadIni();
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{
