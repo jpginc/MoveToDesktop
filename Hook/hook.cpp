@@ -109,13 +109,21 @@ VOID FreeCom()
 
 void HandleSysCommand(WPARAM numberOfTheDestinationDesktop, HWND hwnd)
 {
+	try {
+
+		if (!InitCom())
+		{
+			Log("InitCom failed");
+			return;
+		}
+
 	if (numberOfTheDestinationDesktop)
 	{
 		Log("Getting RootWindow of %X to move to %X", hwnd, numberOfTheDestinationDesktop);
 		HWND rootHwnd = GetAncestor(hwnd, GA_ROOTOWNER);
 		if (rootHwnd != NULL)
 		{
-			Log("Root window is null");
+			Log("Root window is not null!, it's %X", rootHwnd);
 			hwnd = rootHwnd;
 		}
 
@@ -127,7 +135,10 @@ void HandleSysCommand(WPARAM numberOfTheDestinationDesktop, HWND hwnd)
 			Log("Failed to get desktops for %X", hwnd);
 			return;
 		}
-
+		Log("gets here");
+		UINT count;
+		pObjectArray->GetCount(&count);
+		Log("Got %X desktops", count);
 		IVirtualDesktop *pDesktop = nullptr;
 		if (SUCCEEDED(pObjectArray->GetAt((UINT)numberOfTheDestinationDesktop, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
 		{
@@ -146,6 +157,11 @@ void HandleSysCommand(WPARAM numberOfTheDestinationDesktop, HWND hwnd)
 			pDesktop->Release();
 		}
 		pObjectArray->Release();
+	}
+	}
+	catch (int e)
+	{
+		Log("Exception %X", e);
 	}
 }
 
