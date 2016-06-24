@@ -52,7 +52,7 @@ BOOL InitCom()
 		Log("> Allready tried to initialize but it failed.");
 		return false;
 	}
-	
+
 	ComStatus = COMSTATUS_ERROR;
 	HRESULT hr = ::CoInitialize(NULL);
 	if (FAILED(hr))
@@ -107,7 +107,25 @@ VOID FreeCom()
 	}
 }
 
-void HandleSysCommand(WPARAM numberOfTheDestinationDesktop, HWND hwnd)
+UINT GetDesktopNumber(UINT desktopNumberWithMask)
+{
+	return desktopNumberWithMask & 0xF;
+}
+
+bool ContainsMask(UINT desktopNumberWithMask)
+{
+	//We use 4 bits for the desktop number (0xF)
+	//A UINT can be 2 or 4 BYTES so zero off the first 2 bytes if it is 4 bytes
+	UINT mask = UINT_MAX & 0xABC0;
+
+	//and remove the first 4 bits (desktop number) from desktopNumberWithMask
+	desktopNumberWithMask = desktopNumberWithMask & (UINT_MAX ^ 0xF);
+	Log("Mask is %X and passed in is %X", mask, desktopNumberWithMask);
+
+	return (desktopNumberWithMask ^ mask) == 0x0;
+}
+
+void HandleSysCommand(WPARAM desktopNumberWithMask, HWND hwnd)
 {
 	try {
 
@@ -117,47 +135,49 @@ void HandleSysCommand(WPARAM numberOfTheDestinationDesktop, HWND hwnd)
 			return;
 		}
 
-	if (numberOfTheDestinationDesktop)
-	{
-		Log("Getting RootWindow of %X to move to %X", hwnd, numberOfTheDestinationDesktop);
-		HWND rootHwnd = GetAncestor(hwnd, GA_ROOTOWNER);
-		if (rootHwnd != NULL)
-		{
-			Log("Root window is not null!, it's %X", rootHwnd);
-			hwnd = rootHwnd;
-		}
+		UINT desktopNumber = GetDesktopNumber((UINT)desktopNumberWithMask);
 
-		Log("Moving %X to %X", hwnd, numberOfTheDestinationDesktop);
-		IObjectArray *pObjectArray = nullptr;
-		HRESULT hr = pDesktopManagerInternal->GetDesktops(&pObjectArray);
-		if (FAILED(hr))
+		if (ContainsMask((UINT)desktopNumberWithMask))
 		{
-			Log("Failed to get desktops for %X", hwnd);
-			return;
-		}
-		Log("gets here");
-		UINT count;
-		pObjectArray->GetCount(&count);
-		Log("Got %X desktops", count);
-		IVirtualDesktop *pDesktop = nullptr;
-		if (SUCCEEDED(pObjectArray->GetAt((UINT)numberOfTheDestinationDesktop, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
-		{
-			GUID id;
-			hr = pDesktop->GetID(&id);
-
-			if (SUCCEEDED(hr))
+			Log("Getting RootWindow of %X to move to %X", hwnd, desktopNumber);
+			HWND rootHwnd = GetAncestor(hwnd, GA_ROOTOWNER);
+			if (rootHwnd != NULL)
 			{
-				Log("pDesktopManager->MoveWindowToDesktop(%X, %X)", hwnd, id);
-				hr = pDesktopManager->MoveWindowToDesktop(hwnd, id);
-				if (! SUCCEEDED(hr))
-				{
-					Log("Error %X on moving %X to %X", hr, hwnd, id);
-				}
+				Log("Root window is not null!, it's %X", rootHwnd);
+				hwnd = rootHwnd;
 			}
-			pDesktop->Release();
+
+			Log("Moving %X to %X", hwnd, desktopNumberWithMask);
+			IObjectArray *pObjectArray = nullptr;
+			HRESULT hr = pDesktopManagerInternal->GetDesktops(&pObjectArray);
+			if (FAILED(hr))
+			{
+				Log("Failed to get desktops for %X", hwnd);
+				return;
+			}
+
+			UINT count;
+			pObjectArray->GetCount(&count);
+			Log("Got %X desktops", count);
+			IVirtualDesktop *pDesktop = nullptr;
+			if (SUCCEEDED(pObjectArray->GetAt((UINT)desktopNumber, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
+			{
+				GUID id;
+				hr = pDesktop->GetID(&id);
+
+				if (SUCCEEDED(hr))
+				{
+					Log("pDesktopManager->MoveWindowToDesktop(%X, %X)", hwnd, id);
+					hr = pDesktopManager->MoveWindowToDesktop(hwnd, id);
+					if (!SUCCEEDED(hr))
+					{
+						Log("Error %X on moving %X to %X", hr, hwnd, id);
+					}
+				}
+				pDesktop->Release();
+			}
+			pObjectArray->Release();
 		}
-		pObjectArray->Release();
-	}
 	}
 	catch (int e)
 	{
@@ -172,21 +192,21 @@ LRESULT CALLBACK GetMsgProc(INT code, WPARAM wParam, LPARAM lParam)
 	{
 		switch (msg->message)
 		{
-			case WM_SYSCOMMAND:
-			{
-				Log("WM_SYSCOMMAND");
-				HandleSysCommand(msg->wParam, msg->hwnd);
-				break;
-			}
+		case WM_SYSCOMMAND:
+		{
+			Log("WM_SYSCOMMAND");
+			HandleSysCommand(msg->wParam, msg->hwnd);
+			break;
+		}
 		}
 	}
-		return CallNextHookEx(NULL, code, wParam, lParam);
+	return CallNextHookEx(NULL, code, wParam, lParam);
 #undef msg
 }
 
 BOOL WINAPI DllMain(HINSTANCE handle, DWORD dwReason, LPVOID reserved)
 {
-	
+
 	if (dwReason == DLL_PROCESS_ATTACH)
 	{
 		Log("Startup");
