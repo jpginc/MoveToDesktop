@@ -159,6 +159,13 @@ void HandleSysCommand(WPARAM desktopNumberWithMask, HWND hwnd)
 			UINT count;
 			pObjectArray->GetCount(&count);
 			Log("Got %X desktops", count);
+
+			if (desktopNumber >= count)
+			{
+				Log("Trying to send to desktop %X but there are only %X desktops!", desktopNumber, count);
+				return;
+			}
+
 			IVirtualDesktop *pDesktop = nullptr;
 			if (SUCCEEDED(pObjectArray->GetAt((UINT)desktopNumber, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
 			{
