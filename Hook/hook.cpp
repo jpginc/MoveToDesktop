@@ -28,7 +28,6 @@
 
 IServiceProvider* pServiceProvider = nullptr;
 IVirtualDesktopManager *pDesktopManager = nullptr;
-IVirtualDesktopManagerInternal* pDesktopManagerInternal = nullptr;
 
 enum EComStatus
 {
@@ -79,19 +78,6 @@ BOOL InitCom()
 		return FALSE;
 	}
 
-
-
-	hr = pServiceProvider->QueryService(CLSID_VirtualDesktopAPI_Unknown, &pDesktopManagerInternal);
-	if (FAILED(hr))
-	{
-		Log("> QueryService(DesktopManagerInternal) failed");
-		pDesktopManager->Release();
-		pDesktopManager = nullptr;
-		pServiceProvider->Release();
-		pServiceProvider = nullptr;
-		return FALSE;
-	}
-
 	ComStatus = COMSTATUS_INITIALIZED;
 	return TRUE;
 }
@@ -101,7 +87,6 @@ VOID FreeCom()
 	if (ComStatus == COMSTATUS_INITIALIZED)
 	{
 		pDesktopManager->Release();
-		pDesktopManagerInternal->Release();
 		pServiceProvider->Release();
 		ComStatus = COMSTATUS_UNINITIALIZED;
 	}
@@ -125,71 +110,52 @@ bool ContainsMask(UINT desktopNumberWithMask)
 	return (desktopNumberWithMask ^ mask) == 0x0;
 }
 
-void HandleSysCommand(WPARAM desktopNumberWithMask, HWND hwnd)
+int GetNumberOfDesktops()
+{
+	const char virtualDesktopIdsGroup[] = "HKEY_CURRENT_USER, SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops";
+	const char virtualDesktopIdsKey[] = "VirtualDesktopIDs";
+
+	return 0;
+}
+
+void MoveToDesktop(GUID desktopId, HWND hwnd)
 {
 	try {
-
 		if (!InitCom())
 		{
 			Log("InitCom failed");
 			return;
 		}
 
-		UINT desktopNumber = GetDesktopNumber((UINT)desktopNumberWithMask);
-
-		if (ContainsMask((UINT)desktopNumberWithMask))
+		HRESULT hr = pDesktopManager->MoveWindowToDesktop(hwnd, desktopId);
+		if (!SUCCEEDED(hr))
 		{
-			Log("Getting RootWindow of %X to move to %X", hwnd, desktopNumber);
-			HWND rootHwnd = GetAncestor(hwnd, GA_ROOTOWNER);
-			if (rootHwnd != NULL)
-			{
-				Log("Root window is not null!, it's %X", rootHwnd);
-				hwnd = rootHwnd;
-			}
-
-			Log("Moving %X to %X", hwnd, desktopNumberWithMask);
-			IObjectArray *pObjectArray = nullptr;
-			HRESULT hr = pDesktopManagerInternal->GetDesktops(&pObjectArray);
-			if (FAILED(hr))
-			{
-				Log("Failed to get desktops for %X", hwnd);
-				return;
-			}
-
-			UINT count;
-			pObjectArray->GetCount(&count);
-			Log("Got %X desktops", count);
-
-			if (desktopNumber >= count)
-			{
-				Log("Trying to send to desktop %X but there are only %X desktops!", desktopNumber, count);
-				return;
-			}
-
-			IVirtualDesktop *pDesktop = nullptr;
-			if (SUCCEEDED(pObjectArray->GetAt((UINT)desktopNumber, __uuidof(IVirtualDesktop), (void**)&pDesktop)))
-			{
-				GUID id;
-				hr = pDesktop->GetID(&id);
-
-				if (SUCCEEDED(hr))
-				{
-					Log("pDesktopManager->MoveWindowToDesktop(%X, %X)", hwnd, id);
-					hr = pDesktopManager->MoveWindowToDesktop(hwnd, id);
-					if (!SUCCEEDED(hr))
-					{
-						Log("Error %X on moving %X to %X", hr, hwnd, id);
-					}
-				}
-				pDesktop->Release();
-			}
-			pObjectArray->Release();
+			Log("Error %X on moving %X to %X", hr, hwnd, desktopId);
 		}
 	}
 	catch (int e)
 	{
 		Log("Exception %X", e);
 	}
+	return;
+}
+
+HWND GetRootHwnd(HWND hwnd)
+{
+	Log("Getting RootWindow of %X", hwnd);
+	HWND rootHwnd = GetAncestor(hwnd, GA_ROOTOWNER);
+	return rootHwnd == NULL ? hwnd : rootHwnd;
+}
+
+void HandleSysCommand(WPARAM desktopNumberWithMask, HWND hwnd)
+{
+	if (!ContainsMask((UINT)desktopNumberWithMask)) return;
+
+	UINT desktopNumber = GetDesktopNumber((UINT)desktopNumberWithMask);
+	GUID desktopId = GetGuidOfDesktopFromRegistry(desktopNumber);
+	if (desktopId == GUID_NULL) return;
+
+	MoveToDesktop(desktopId, GetRootHwnd(hwnd));
 }
 
 LRESULT CALLBACK GetMsgProc(INT code, WPARAM wParam, LPARAM lParam)
