@@ -23,6 +23,8 @@
 #include <Windows.h>
 #include <stdio.h>
 #include <process.h>
+#include <Windows.h>
+#include <vector>
 #include "VirtualDesktops.h"
 #include "../shared.h"
 
@@ -110,15 +112,41 @@ bool ContainsMask(UINT desktopNumberWithMask)
 	return (desktopNumberWithMask ^ mask) == 0x0;
 }
 
-int GetNumberOfDesktops()
+GUID* GetGuidOfDesktopFromRegistry(int desktopIndex)
 {
-	const char virtualDesktopIdsGroup[] = "HKEY_CURRENT_USER, SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops";
-	const char virtualDesktopIdsKey[] = "VirtualDesktopIDs";
+	HKEY hKey;
+	LONG result;
+	unsigned long type = REG_DWORD, size;
+	const LPCSTR virtualDesktopIdsGroup = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VirtualDesktops";
+	const LPCSTR virtualDesktopIdsKey = "VirtualDesktopIDs";
 
-	return 0;
+
+	result = RegOpenKeyEx(HKEY_CURRENT_USER, virtualDesktopIdsGroup, 0, KEY_READ, &hKey);
+	if (result == ERROR_SUCCESS)
+	{
+		result = RegQueryValueEx(hKey, virtualDesktopIdsKey, NULL, &type, NULL, &size);
+		if (result == ERROR_SUCCESS && (size / (sizeof(GUID)) > desktopIndex))
+		{
+			Log("The size is %d", size);
+			std::vector<unsigned char> buffer(size);
+			result = RegQueryValueEx(hKey, virtualDesktopIdsKey, NULL, &type, &buffer.front(), &size);
+			return reinterpret_cast<GUID*>(&buffer.front()) + desktopIndex;
+		}
+		else
+		{
+			printf("Cant get the size");
+		}
+		RegCloseKey(hKey);
+	}
+	else
+	{
+		printf("error %d", result);
+	}
+
+	return nullptr;
 }
 
-void MoveToDesktop(GUID desktopId, HWND hwnd)
+void MoveToDesktop(GUID* desktopId, HWND hwnd)
 {
 	try {
 		if (!InitCom())
@@ -127,10 +155,10 @@ void MoveToDesktop(GUID desktopId, HWND hwnd)
 			return;
 		}
 
-		HRESULT hr = pDesktopManager->MoveWindowToDesktop(hwnd, desktopId);
+		HRESULT hr = pDesktopManager->MoveWindowToDesktop(hwnd, *desktopId);
 		if (!SUCCEEDED(hr))
 		{
-			Log("Error %X on moving %X to %X", hr, hwnd, desktopId);
+			Log("Error %X on moving %X to %X", hr, hwnd, *desktopId);
 		}
 	}
 	catch (int e)
@@ -152,8 +180,8 @@ void HandleSysCommand(WPARAM desktopNumberWithMask, HWND hwnd)
 	if (!ContainsMask((UINT)desktopNumberWithMask)) return;
 
 	UINT desktopNumber = GetDesktopNumber((UINT)desktopNumberWithMask);
-	GUID desktopId = GetGuidOfDesktopFromRegistry(desktopNumber);
-	if (desktopId == GUID_NULL) return;
+	GUID* desktopId = GetGuidOfDesktopFromRegistry(desktopNumber);
+	if (desktopId == nullptr) return;
 
 	MoveToDesktop(desktopId, GetRootHwnd(hwnd));
 }
